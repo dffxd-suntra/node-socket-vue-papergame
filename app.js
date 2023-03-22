@@ -37,9 +37,6 @@ app.use(function (req, res, next) {
 // 开放public里面的所有文件
 app.use(express.static(path.join(__dirname, "public")));
 
-// 主页面
-app.use("/", require("./routers/home"));
-
 // 如果没有返回页面就到错误部分
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

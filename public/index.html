@@ -4,9 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-        <%= title %>
-    </title>
+    <title></title>
     <link rel="shortcut icon" href="#" />
     <link rel="stylesheet" href="css/bootstrap.cyborg.min.css" />
     <style>
@@ -37,8 +35,10 @@
 </head>
 
 <body>
-    <%- include(page); %>
     <script src="script/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { createApp } from "./script/vue.esm-browser.js";
+    </script>
 </body>
 
 </html>
