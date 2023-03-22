@@ -37,9 +37,6 @@ app.use(function (req, res, next) {
 // 开放public里面的所有文件
 app.use(express.static(path.join(__dirname, "public")));
 
-// 检查是否安装
-app.use(require("./routers/install"));
-
 // 主页面
 app.use("/", require("./routers/home"));
 
