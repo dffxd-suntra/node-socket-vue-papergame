@@ -1,2 +1,2 @@
-# node-socket-vue-papergame
- 简单的小程序,会更新到同学对这个没有兴趣为止
+fork by [https://github.com/dwcares/realchess](https://github.com/dwcares/realchess)  
+做了不少优化

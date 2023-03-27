@@ -1,44 +1,53 @@
-<!DOCTYPE html>
-<html lang="zh">
+<!doctype html>
+<html>
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title></title>
-    <link rel="shortcut icon" href="#" />
-    <link rel="stylesheet" href="css/bootstrap.cyborg.min.css" />
-    <style>
-        ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            width: 10px;
-            border-radius: 10px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border: solid 1px rgba(150, 150, 150);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        ::-webkit-scrollbar-corner {
-            background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABJSURBVChTY/z/iQEPYILSOABImpEPhOAAjcsANB9iBZyEM4izG81wOEDohosim4dwOVAUgoDgrZYKhMTpMYgK7NLC1+6AyGt3AKeXIPH7jPPdAAAAAElFTkSuQmCC);
-        }
-
-        #content>div {
-            background-color: rgba(3, 5, 7, 60%);
-        }
-    </style>
+    <meta name="viewport" content="width=410; user-scalable=no; minimal-ui">
+    <title>象棋</title>
+    <link rel="stylesheet" href="./lib/bootstrap-5.3.0/css/bootstrap.cosmo.min.css" />
+    <link rel="stylesheet" href="./lib/chessboard-0.3.0.min.css" />
+    <link rel="stylesheet" href="default.css" />
 </head>
 
 <body>
-    <script src="script/bootstrap.bundle.min.js"></script>
-    <script type="module">
-        import { createApp } from "./script/vue.esm-browser.js";
-    </script>
+    <div class="page login" id="page-login">
+        <img class="logo" src="/img/chesslogo.jpg" />
+        <label>
+            用户名:&nbsp;<input id="username" type="text" /></input>
+        </label>
+        <label>
+            密码:&nbsp;<input id="password" type="password" /></input>
+        </label>
+        <p id="login-warn"></p>
+        <button id="login">登入/注册</button>
+        <blockquote>没有这个账户的话会自动创建</blockquote>
+    </div>
+    <div class="page lobby" id="page-lobby">
+        <h1>象棋</h1>
+        <h2 id="userLabel"></h2>
+        <h3>游戏列表</h3>
+        <div id="gamesList">
+            没有进行中的游戏
+        </div>
+        <h3>在线用户</h3>
+        <div id="userList">
+            没有在线用户
+        </div>
+    </div>
+    <div class="page game" id="page-game">
+        <button id="game-back">暂时回到大厅</button>
+        <button id="game-resign">结束游戏</button>
+        <div id="game-board" style="width: 400px">
+        </div>
+    </div>
+
+    <script src="./lib/socket.io.js"></script>
+    <script src="./lib/jquery.min.js"></script>
+    <script src="./lib/chess.min.js"></script>
+    <script src="./lib/chessboard-0.3.0.min.js"></script>
+    <script src="./lib/md5.min.js"></script>
+    <script src="./lib/bootstrap-5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="default.js"></script>
 </body>
 
 </html>

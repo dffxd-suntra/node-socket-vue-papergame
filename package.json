@@ -1,23 +1,28 @@
 {
-  "name": "papergame",
+  "name": "RealChess",
   "version": "0.0.1",
-  "scripts": {
-    "start": "node ./bin/www",
-    "devstart": "nodemon ./bin/www"
+  "description": "Real-time chess game ",
+  "main": "app.js",
+  "engines": {
+    "node": ">=6.9.1"
   },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dwcares/socketserver"
+  },
+  "author": "dwcares",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dwcares/socketserver/issues"
+  },
+  "homepage": "https://github.com/dwcares/socketserver",
   "dependencies": {
-    "better-sqlite3": "^8.2.0",
-    "cookie-parser": "^1.4.6",
-    "debug": "^4.3.4",
-    "ejs": "^3.1.9",
+    "bootstrap": "^5.3.0-alpha1",
     "express": "^4.18.2",
-    "http-errors": "^2.0.0",
-    "morgan": "^1.10.0",
-    "node-phpass": "^1.0.5",
     "socket.io": "^4.6.1",
     "uuid": "^9.0.0"
-  },
-  "devDependencies": {
-    "eslint": "^8.36.0"
   }
 }
