@@ -3,42 +3,68 @@
 
 <head>
     <meta name="viewport" content="width=410; user-scalable=no; minimal-ui">
-    <title>象棋</title>
+    <title>登陆界面</title>
     <link rel="stylesheet" href="./lib/bootstrap-5.3.0/css/bootstrap.cosmo.min.css" />
     <link rel="stylesheet" href="./lib/chessboard-0.3.0.min.css" />
-    <link rel="stylesheet" href="default.css" />
+    <link rel="stylesheet" href="./default.css" />
 </head>
 
-<body>
-    <div class="page login" id="page-login">
-        <img class="logo" src="/img/chesslogo.jpg" />
-        <label>
-            用户名:&nbsp;<input id="username" type="text" /></input>
-        </label>
-        <label>
-            密码:&nbsp;<input id="password" type="password" /></input>
-        </label>
-        <p id="login-warn"></p>
-        <button id="login">登入/注册</button>
-        <blockquote>没有这个账户的话会自动创建</blockquote>
+<body class="d-flex flex-column align-items-center">
+    <!-- 浮动的登录窗口 -->
+    <div class="page login d-flex justify-content-center justify-content-center" id="page-login">
+        <div class="d-flex row col-8 mt-3">
+            <div class="col">
+                <img class="logo img-fluid" src="/img/chesslogo.jpg" />
+            </div>
+
+            <div class="col">
+                <label class="form-label" for="username">用户名:</label>
+                <input id="username" type="text" class="form-control" />
+                <label class="form-label" for="password">密码:</label>
+                <input id="password" type="password" class="form-control" />
+                <p id="login-warn"></p>
+                <button id="login" class="btn btn-secondary">登入/注册</button>
+                <!-- <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="" id="rememberme" checked>
+                    <label class="form-check-label" for="rememberme">
+                        记住我
+                    </label>
+                </div> -->
+                <blockquote>没有这个账户的话会自动创建</blockquote>
+            </div>
+        </div>
     </div>
-    <div class="page lobby" id="page-lobby">
+
+    <!-- 大堂界面 -->
+    <div class="page lobby col-6" id="page-lobby">
         <h1>象棋</h1>
         <h2 id="userLabel"></h2>
-        <h3>游戏列表</h3>
-        <div id="gamesList">
-            没有进行中的游戏
+        <h3 class="border-bottom">游戏列表 <small><button type="button" class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#newRoomForm">创建新房间</button></small></h3>
+        <div id="newRoomForm" class="collapse border-bottom">
+            <label class="form-label" for="roomname">房间名:</label>
+            <input id="roomname" type="text" class="form-control" />
+            <label class="form-label" for="roompassword">密码:</label>
+            <input id="roompassword" type="password" class="form-control" />
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="" id="isPublic" checked>
+                <label class="form-check-label" for="isPublic">
+                    公开房间
+                </label>
+            </div>
+            <button id="creatNewRoom" class="btn btn-secondary mb-3 mt-3">创建房间</button>
+            <blockquote>密码为空房间无密码</blockquote>
         </div>
-        <h3>在线用户</h3>
+        <ul id="roomList" class="mb-3 list-group list-group-flush">
+            没有开放的房间
+        </ul>
+        <!-- <h3 class="border-bottom">在线用户</h3>
         <div id="userList">
             没有在线用户
-        </div>
+        </div> -->
     </div>
-    <div class="page game" id="page-game">
-        <button id="game-back">暂时回到大厅</button>
-        <button id="game-resign">结束游戏</button>
-        <div id="game-board" style="width: 400px">
-        </div>
+
+    <!-- 房间界面 -->
+    <div class="page room container-sm" id="page-game">
     </div>
 
     <script src="./lib/socket.io.js"></script>

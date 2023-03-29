@@ -1,217 +1,97 @@
-let socket, serverGame;
-let username, playerColor;
-let game, board;
-let usersOnline = [];
-let myGames = [];
-socket = io();
+let socket = io();
+let user = {};
+let rooms = [];
 
-//////////////////////////////
-// Socket.io handlers
-////////////////////////////// 
-
-// 登陆成功时
-socket.on("login", function (msg) {
-    localStorage.setItem();
-    // 切换到大厅界面
-    $("#page-login").hide();
-    $("#page-lobby").show();
-
-    $("#userLabel").text(username);
-
-    usersOnline = msg.users;
-    updateUserList();
-
-    myGames = msg.games;
-    updateGamesList();
+socket.on("doLogout", function () {
+    console.log("out");
+    $("#page-login").css("transform", "");
+    user = {};
 });
 
-// 有用户进入大厅
-socket.on("joinlobby", function (msg) {
-    addUser(msg);
+// 更新用户资料时
+socket.on("updateUserInfo", function (userInfo) {
+    user = userInfo;
+    updateUserInfo();
 });
 
-// 有用户离开大厅
-socket.on("leavelobby", function (msg) {
-    removeUser(msg);
+socket.on("updateRoomList", function (roomList) {
+    rooms = roomList;
+    updateRoomList();
 });
 
-// 有新游戏
-socket.on("gameadd", function (msg) {
-});
+function updateUserInfo() {
+    $("#userLabel").text(user.username);
+}
 
-// 结束游戏
-socket.on("resign", function (msg) {
-    if (msg.gameId == serverGame.id) {
-
-        socket.emit("login", username);
-
-        $("#page-lobby").show();
-        $("#page-game").hide();
+function updateRoomList() {
+    if (rooms.length == 0) {
+        $("#roomList").html("");
+        $("#roomList").text("没有开放的房间");
+        return;
     }
-});
 
-// 加入游戏
-socket.on("joingame", function (msg) {
-    console.log("joined as game id: " + msg.game.id);
-    playerColor = msg.color;
-    initGame(msg.game);
+    rooms.sort(function (x, y) {
+        return x.reg_date > y.reg_date;
+    });
+    console.log(rooms);
 
-    $("#page-lobby").hide();
-    $("#page-game").show();
-
-});
-
-// 移动棋子
-socket.on("move", function (msg) {
-    if (serverGame && msg.gameId === serverGame.id) {
-        game.move(msg.move);
-        board.position(game.fen());
+    $("#roomList").html("");
+    for (let i in rooms) {
+        let room = rooms[i];
+        $("#roomList").append(
+            $(`<li class="list-group-item">`).append(
+                $(`<h3>`).text(room.roomname)
+            )
+        );
     }
-});
-
-// 有用户登出
-socket.on("logout", function (msg) {
-    removeUser(msg.username);
-});
-
-
-
-//////////////////////////////
-// Menus
-////////////////////////////// 
+}
 
 // 当点击登录按钮
 $("#login").click(function () {
     let password_hash = md5($("#password").val());
-    username = $("#username").val();
+    let username = $("#username").val();
 
-    username = username.trim();
-
-    if (username.length == 0) {
+    // 有前后空格或者长度为0是违法用户名
+    if (username != username.trim() || username.length == 0) {
         $("#login-warn").text("用户名不合法");
         return;
     }
 
-    socket.emit("login", username, password_hash);
-});
+    /* if ($("#rememberme").prop("checked")) {
+        localStorage.setItem("username", username);
+        localStorage.setItem("password_hash", password_hash);
+    } */
 
-// 回到主页(不结束)
-$("#game-back").click(function () {
-    socket.emit("login", username);
-
-    $("#page-game").hide();
-    $("#page-lobby").show();
-});
-
-// 结束游戏
-$("#game-resign").click(function () {
-    socket.emit("resign", { userId: username, gameId: serverGame.id });
-
-    socket.emit("login", username);
-    $("#page-game").hide();
-    $("#page-lobby").show();
-});
-
-function addUser(userId) {
-    usersOnline.push(userId);
-    updateUserList();
-}
-
-function removeUser(userId) {
-    for (let i = 0; i < usersOnline.length; i++) {
-        if (usersOnline[i] === userId) {
-            usersOnline.splice(i, 1);
+    socket.emit("doLogin", username, password_hash, function (response) {
+        console.log(response);
+        if (response.status == "success") {
+            // 切换到大厅界面
+            $("#page-login").css("transform", "translateY(-100%)");
         }
-    }
-    updateUserList();
-}
-
-// 有关的
-function updateGamesList() {
-    $("#gamesList").html("");
-    myGames.forEach(function (game) {
-        $("#gamesList").append(
-            $("<button>")
-                .text("#" + game)
-                .click(function () {
-                    socket.emit("resumegame", game);
-                })
-        );
+        if (response.status == "fail") {
+            $("#login-warn").text(response.message);
+        }
     });
-}
+});
 
-function updateUserList() {
-    $("#userList").html("");
-    usersOnline.forEach(function (user) {
-        $("#userList").append(
-            $("<button>")
-                .text(user)
-                .click(function () {
-                    socket.emit("invite", user);
-                })
-        );
+$("#creatNewRoom").click(function () {
+    let roomname = $("#roomname").val();
+    let roompassword_hash = md5($("#roompassword").val());
+    let isPublic = $("#isPublic").prop("checked");
+
+    let havePassword = (roompassword == "");
+
+    socket.emit("creatNewRoom", { roomname, roompassword_hash, isPublic, havePassword }, function (roomInfo) {
+        console.log(roomInfo);
     });
-}
+});
 
-//////////////////////////////
-// Chess Game
-////////////////////////////// 
+// 检测是否存储用户名密码
+/* if (localStorage.getItem("username") != null) {
+    localStorage.setItem("username", username);
+    localStorage.setItem("password_hash", password_hash);
+} */
 
-// 新游戏
-function initGame(serverGameState) {
-    serverGame = serverGameState;
-
-    let cfg = {
-        draggable: true,
-        showNotation: false,
-        orientation: playerColor,
-        position: serverGame.board ? serverGame.board : "start",
-        onDragStart: onDragStart,
-        onDrop: onDrop,
-        onSnapEnd: onSnapEnd
-    };
-
-    game = (serverGame.board ? new Chess(serverGame.board) : new Chess());
-    board = new ChessBoard("game-board", cfg);
-}
-
-// do not pick up pieces if the game is over
-// only pick up pieces for the side to move
-function onDragStart(source, piece, position, orientation) {
-    if (game.game_over() === true ||
-        (game.turn() === "w" && piece.search(/^b/) !== -1) ||
-        (game.turn() === "b" && piece.search(/^w/) !== -1) ||
-        (game.turn() !== playerColor[0])) {
-        return false;
-    }
-}
-
-
-// 正在下棋
-function onDrop(source, target) {
-    // see if the move is legal
-    let move = game.move({
-        from: source,
-        to: target,
-        promotion: "q" // NOTE: always promote to a queen for example simplicity
-    });
-
-    // illegal move
-    if (move === null) {
-        return "snapback";
-    } else {
-        socket.emit("move", {
-            move: move,
-            gameID: serverGame.id,
-            board: game.fen()
-        });
-    }
-
-}
-
-// update the board position after the piece snap 
-// for castling, en passant, pawn promotion
-function onSnapEnd() {
-    board.position(game.fen());
-}
-
+$("#username").val("114514");
+$("#password").val("1919810");
+$("#login").click();

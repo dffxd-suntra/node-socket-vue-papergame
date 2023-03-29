@@ -1,19 +1,3 @@
-// 引库
-let uuid = require("uuid");
-let fs = require("fs");
-
-// 网页
-let express = require("express");
-let app = express();
-app.use(express.static("public"));
-
-// 初始化socket
-let http = require("http").Server(app);
-let io = require("socket.io")(http);
-
-// 配置
-let port = process.env.PORT || 3000;
-
 let users = [];
 
 let rooms = [];
@@ -82,4 +66,3 @@ function doLogout(user) {
     }
 }
 
-io.on("connection", function (socket) { });

@@ -1,47 +1,24 @@
 // 引库
 let uuid = require("uuid");
 let fs = require("fs");
+let help = require("./modules/help");
 
 // 网页
 let express = require("express");
 let app = express();
 app.use(express.static("public"));
+app.use("/ajax", require("./router/ajax"));
 
 // 初始化socket
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
 
 // 配置
-let port = process.env.PORT || 3000;
+const config = JSON.parse(fs.readFileSync("./config.json"));
 
-const DATA = {};
+let users = [];
 
-// 所有用户
-let users = DATA.users = [];
-// 大堂用户
-let lobbyUsers = {};
-// 所有游戏
-let games = DATA.games = {};
-// 活跃的游戏
-let activeGames = DATA.activeGames = {};
-// 开启debug
-let debug = false;
-
-function argumentsToArray(arg) {
-    let t = [];
-    for (let i = 0; i < arg.length; i++) {
-        t[i] = arg[i];
-    }
-    return t;
-}
-
-function userEmit() {
-    let user = argumentsToArray(arguments).shift();
-
-    for (let i in user.sockets) {
-        user.sockets.emit.apply(null, arguments);
-    }
-}
+let rooms = Object.create(null);
 
 // 登录活动
 function doLogin(socket, username, password_hash) {
@@ -49,23 +26,36 @@ function doLogin(socket, username, password_hash) {
 
     if (user === false) {
         user = creatUser({ username, password_hash });
-        user.sockets[socket.id] = socket;
-        return user;
+        user.socket = socket;
+        socket.userId = user.id;
+        return;
     }
 
     if (user.password_hash === password_hash) {
-        user.sockets[socket.id] = socket;
-        return user;
+        if (user.socket != null) {
+            doLogout(user);
+        }
+        user.socket = socket;
+        socket.userId = user.id;
+        return;
+    } else {
+        throw new Error("密码错误!");
     }
-
-    return false;
 }
 
-function creatUser(data = {}) {
+function creatUser({ username, password_hash }, add = {}) {
     let id = users.length;
-    users[id] = { id: id, sockets: {}, status: "", games: {} };
-    for (let i in data) {
-        users[id][i] = data[i];
+    users[id] = {
+        id,
+        status: "",
+        games: {},
+        username,
+        password_hash,
+        socket: null,
+        reg_date: Date.now()
+    };
+    for (let i in add) {
+        users[id][i] = add[i];
     }
     return users[id];
 }
@@ -79,266 +69,125 @@ function findUser(key, value) {
     return users.find(user => user[key] == value) || false;
 }
 
-function isOnline(user) {
-    return Object.keys(user.sockets).length != 0;
-}
-
-function getGames() { }
-
-function getUsers() { }
-
 function doLogout(user) {
-    for (let i in user.sockets) {
-        user.sockets[i].emit("dologout");
-        user.sockets[i].disconnect(true);
-        delete user.sockets[i];
-    }
-
-    Object.values(user.sockets)[0].broadcast.emit("logout", user.id);
+    user.socket.emit("doLogout");
+    delete user.socket.userId;
+    delete user.socket.roomId;
+    user.socket = null;
 }
 
-function joinLobby(user) {
-    lobbyUsers[user.id] = user;
-
-    Object.values(user.sockets)[0].broadcast.emit("joinlobby", { id: user.id, name: user.username });
-}
-
-function leaveLobby(user) {
-    delete lobbyUsers[user.id];
-
-    Object.values(user.sockets)[0].broadcast.emit("leavelobby", user.id);
-}
-
-function creatGame(user, { type = "", public = true }) {
-    // 初始化比赛
-    let game = {
-        type: type,
-        status: "",
-        board: null,
-        public: public,
-        waiting: {},
-        history: [],
-        users: {}
-    };
-
-    // uuid4重复的概率很小,但是架不住运气啊
+function creatNewRoom(socket, { roomname, roompassword_hash, isPublic, havePassword }) {
+    let id;
     do {
-        game.id = uuid.v4();
-    } while (game.id in games);
+        id = help.generateHexID(5);
+    } while (id in rooms);
 
-    games[game.id] = activeGames[game.id] = game;
-
-    leaveLobby(game, user);
-    joinGame(game, user, { type: "master" });
-
-    return game;
-}
-
-function resignGame(game) {
-    for (let i in game.waiting) {
-        if (game.waiting[i].type == "invite") {
-            rejectInvite(game, game.waiting[i].user);
-        }
-        if (game.waiting[i].type == "join") {
-            rejectJoinGame(game, game.waiting[i].user);
-        }
-    }
-    for (let i in game.users) {
-        leaveGame(game, game.users[i]);
-    }
-    delete activeGames[game.id];
-}
-
-function findGame(key, value) {
-    if (key == "id") {
-        return games[value] || false;
-    }
-    return Object.values(games).find(game => game[key] == value) || false;
-}
-
-function joinGame(game, user, { type = "gamer" }) {
-    game.users[user.id] = { user, type: type };
-
-    user.games[game.id] = game;
-
-    for (let i in game.users) {
-        userEmit(game.users[i], "joingame", { game: game, color: "white" });
-    }
-}
-
-function leaveGame(game, user) {
-    delete user.games[game.id];
-    delete game.users[user.id];
-
-    for (let i in game.users) {
-        userEmit(game.users[i], "leavegame");
-    }
-}
-
-function inviteToJoinGame(game, user) {
-    game.waiting[user.id] = {
-        type: "invite",
-        user: user
+    rooms[id] = {
+        id,
+        roomname,
+        roompassword_hash,
+        isPublic,
+        havePassword,
+        master: socket.userId,
+        users: {},
+        reg_date: Date.now()
     };
 
-    userEmit(user, "invitetojoingame", game);
+    return rooms[id];
 }
 
-function agreeInvite(game, user) {
-    delete game.waiting[user.id];
-    game.users[user.id] = user;
-
-    userEmit(user, "agreeinvite", game);
+function updateUserInfo(user) {
+    user.socket.emit("updateUserInfo", {
+        id: user.id,
+        username: user.username,
+        reg_date: user.reg_date
+    });
 }
 
-function rejectInvite(game, user) {
-    delete game.waiting[user.id];
+function updateRoomList() {
+    let roomList = [];
+    for (let i in rooms) {
+        let room = {};
+        room.id = rooms[i].id;
+        room.roomname = rooms[i].roomname;
+        room.isPublic = rooms[i].isPublic;
+        room.havePassword = rooms[i].havePassword;
+        room.reg_date = rooms[i].reg_date;
 
-    userEmit(user, "rejectinvite", game);
+        let user = findUser("id", rooms[i].master);
+        
+        room.master = {
+            id: user.id,
+            username: user.username,
+            reg_date: user.reg_date
+        };
+        roomList.push(room);
+    }
+
+    for (let i in users) {
+        users[i].socket.emit("updateRoomList", roomList);
+    }
 }
 
-function applyToJoinGame(game, user) {
-    game.waiting[user.id] = {
-        type: "join",
-        user: user
-    };
-
-    userEmit(user, "applytojoingame", game);
-}
-
-function agreeJoinGame(game, user) {
-    delete game.waiting[user.id];
-    game.users[user.id] = user;
-
-    userEmit(user, "agreejoingame", game);
-}
-
-function rejectJoinGame(game, user) {
-    delete game.waiting[user.id];
-
-    userEmit(user, "rejectjoingame", game);
-}
-
-
-// 新接入用户
 io.on("connection", function (socket) {
-    // 用户
-    let user = null;
+    console.log("新链接者", socket.handshake.address, socket.id);
 
-    // 显示
-    console.log("新玩家: " + socket.handshake.address);
-
-    // 自定义
-    socket.userEmit = function () {
-        for (let i in user.sockets) {
-            user.sockets[i].emit.apply(null, arguments);
+    socket.on("doLogin", function (username, password_hash, callback) {
+        if (socket.userId == undefined) {
+            try {
+                doLogin(socket, username, password_hash);
+            } catch (message) {
+                callback({ status: "fail", message });
+                console.log(message);
+                return;
+            };
         }
-    };
 
-    // 登录
-    socket.on("login", function (username, password_hash) {
-        user = doLogin(socket, username, password_hash);
+        callback({ status: "success" });
 
-        if (user === false) {
-            socket.emit("loginfail");
+        let user = findUser("id", socket.userId);
+
+        updateUserInfo(user);
+        updateRoomList();
+    });
+
+    socket.on("creatNewRoom", function (roomInfo, callback) {
+        let room;
+        try {
+            room = creatNewRoom(socket, roomInfo);
+        } catch (message) {
+            callback({ status: "fail", message });
+            console.log(message);
             return;
-        }
+        };
 
-        joinLobby(user);
-
-        socket.userID = user.id;
-
-        // 登录/注册成功
-        socket.emit("login", {
-            users: getUsers(),
-            games: getGames()
+        roomInfo.id = room.id;
+        callback({
+            status: "success",
+            info: {
+                id: room.id,
+                roomname: room.roomname,
+                isPublic: room.isPublic,
+                havePassword: room.havePassword,
+                reg_date: room.reg_date
+            }
         });
-    });
 
-    // 登出
-    socket.on("logout", function () {
-        doLogout(user);
-    });
-
-    // 创建游戏
-    socket.on("creatgame", function (info) {
-        let game = creatGame(user);
-        socket.broadcast.emit("creatgame", game);
-    });
-
-    // 申请加入游戏
-    socket.on("applytojoingame", function (gameID) {
-        let game = findGame("id", gameID);
-        applyToJoinGame(game, user);
-    });
-
-    // 回复申请加入游戏
-    socket.on("respondjoingame", function (gameID, guestID, status) {
-        let game = findGame("id", gameID);
-        let guest = findUser("id", guestID);
-        if (status) {
-            agreeJoinGame(game, guest);
-        } else {
-            rejectJoinGame(game, guest);
-        }
-    });
-
-    // 离开游戏
-    socket.on("leavegame", function (gameID) {
-        let game = findGame("id", gameID);
-        leaveGame(game, user);
-    });
-
-    // 邀请别人
-    socket.on("invitetojoingame", function (gameID, guestID) {
-        // 获取用户信息
-        let game = findGame("id", gameID);
-        let guest = findUser("id", guestID);
-        inviteToJoinGame(game, guest);
-    });
-
-    // 回应邀请
-    socket.on("respondinvite", function (gameID, guestID, status) {
-        let game = findGame("id", gameID);
-        let guest = findUser("id", guestID);
-        if (status) {
-            agreeInvite(game, guest);
-        } else {
-            rejectInvite(game, guest);
-        }
-    });
-
-    // 移动
-    socket.on("move", function (msg) {
-        let game = games[msg.gameID];
-        game.board = msg.board;
-        game.history.push(msg.move);
-
-        for (let i in game.users) {
-            game.users[i].user.socket.emit("move", msg);
-        }
-    });
-
-    // 结束游戏
-    socket.on("resigngame", function (gameID, reason) {
-        let game = findGame("id", gameID);
-        resignGame(game);
-        socket.broadcast.emit("resigngame", reason);
+        updateRoomList();
     });
 
     // 结束链接
-    socket.on("disconnect", function (msg) {
-        if (user === null) {
+    socket.on("disconnect", function (message) {
+        console.log("链接取消", socket.handshake.address, socket.id);
+        if (socket.userId == undefined) {
             return;
         }
 
-        delete user.sockets[socket.id];
-
-        console.log(user.username, socket.handshake.address, msg, isOnline(user));
+        let user = findUser(socket.userId);
+        doLogout(user);
     });
 });
 
-// 监听端口
-http.listen(port, function () {
-    console.log(`listening on http://127.0.0.1:${port}/`);
-});
+http.listen(config.port);
+
+console.log(`server running on: http://127.0.0.1:${config.port}/`);
