@@ -5,19 +5,20 @@
     <meta name="viewport" content="width=410; user-scalable=no; minimal-ui">
     <title>登陆界面</title>
     <link rel="stylesheet" href="./lib/bootstrap-5.3.0/css/bootstrap.cosmo.min.css" />
+    <link rel="stylesheet" href="./lib/bootstrap-icons-1.10.3/bootstrap-icons.css" />
     <link rel="stylesheet" href="./lib/chessboard-0.3.0.min.css" />
     <link rel="stylesheet" href="./default.css" />
 </head>
 
 <body class="d-flex flex-column align-items-center">
     <!-- 浮动的登录窗口 -->
-    <div class="page login d-flex justify-content-center justify-content-center" id="page-login">
+    <div class="page login d-flex justify-content-center" id="page-login">
         <div class="d-flex row col-8 mt-3">
-            <div class="col">
+            <div class="col d-flex flex-column justify-content-center">
                 <img class="logo img-fluid" src="/img/chesslogo.jpg" />
             </div>
 
-            <div class="col">
+            <div class="col d-flex flex-column justify-content-center">
                 <label class="form-label" for="username">用户名:</label>
                 <input id="username" type="text" class="form-control" />
                 <label class="form-label" for="password">密码:</label>
@@ -64,7 +65,32 @@
     </div>
 
     <!-- 房间界面 -->
-    <div class="page room container-sm" id="page-game">
+    <div class="page room container-sm" id="page-game" style="display: none;">
+        <h1>房间界面</h1>
+        <button id="leave" class="btn btn-secondary">离开房间</button>
+        <video id="localVideo" autoplay="autoplay"></video>
+        <div id="rtcVideoContainer"></div>
+    </div>
+
+    <!-- 加入房间模态 -->
+    <div class="page join modal" tabindex="-1" id="page-join">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">加入带密码的房间</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" for="joinpassword">密码:</label>
+                    <input id="joinpassword" type="password" class="form-control" />
+                    <p id="join-warn"></p>
+                    <button id="join" class="btn btn-secondary">加入</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="./lib/socket.io.js"></script>
