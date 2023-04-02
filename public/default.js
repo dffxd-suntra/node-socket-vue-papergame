@@ -1,5 +1,5 @@
 let socket = io();
-let user = {};
+let me = {};
 let rooms = [];
 let choosedRoom = null;
 
@@ -62,8 +62,7 @@ $("#join").click(function () {
 
     socket.emit("joinRoom", choosedRoom.id, joinpassword_hash, function (joinInfo) {
         if (joinInfo.status == "success") {
-            ROOM.room = choosedRoom;
-            history.pushState(null, "?room=" + roomNow.id);
+            history.pushState(null, "?room=" + choosedRoom.id);
 
             $("#page-join").removeClass("show");
             $("#page-join").css("display", "");
@@ -81,6 +80,7 @@ $("#join").click(function () {
 
 $("#leave").click(function () {
     socket.emit("leaveRoom", function () {
+        ROOM.closeRoom();
         $("#page-game").fadeOut(function () {
             $("#page-lobby").fadeIn();
         });
@@ -91,12 +91,15 @@ $("#leave").click(function () {
 socket.on("doLogout", function () {
     console.log("out");
     $("#page-login").css("transform", "");
-    user = {};
+    me = {};
+    if (ROOM.room != null) {
+        ROOM.closeRoom();
+    }
 });
 
 // 更新用户资料时
 socket.on("updateUserInfo", function (userInfo) {
-    user = userInfo;
+    me = userInfo;
     updateUserInfo();
 });
 
@@ -106,7 +109,7 @@ socket.on("updateRoomList", function (roomList) {
 });
 
 function updateUserInfo() {
-    $("#userLabel").text(user.username);
+    $("#userLabel").text(me.username);
 }
 
 function updateRoomList() {
@@ -127,7 +130,7 @@ function updateRoomList() {
         $("#roomList").append(
             $(`<li class="list-group-item">`).append(
                 $(`<h3 onclick="joinRoom('${room.id}');">`)
-                    .text(`${room.roomname} (roomId: ${room.id})` + (room.master.id == user.id ? "(你自己的)" : ""))
+                    .text(`${room.roomname} (roomId: ${room.id})` + (room.master.id == me.id ? "(你自己的)" : ""))
                     .append(room.havePassword ? `<i class="bi bi-lock-fill" style="float:right;"></i>` : "")
                     .append(room.isPublic ? "" : `<i class="bi bi-shield-shaded" style="float:right;"></i>`),
                 $(`<p>`).text(`master: ${room.master.username} (userId: ${room.master.id})`),
@@ -147,8 +150,7 @@ function joinRoom(roomId) {
     } else {
         socket.emit("joinRoom", room.id, md5(""), function (joinInfo) {
             if (joinInfo.status == "success") {
-                ROOM.room = room;
-                history.pushState(null, "?room=" + roomNow.id);
+                history.pushState(null, "?room=" + room.id);
 
                 $("#page-lobby").fadeOut(function () {
                     ROOM.initRoom();
@@ -167,30 +169,67 @@ const ROOM = { // 房间内信息转发 roomData
     room: null,
     localVideo: $("#localVideo"),
     rtcVideoContainer: $("#rtcVideoContainer"),
+    localStream: new MediaStream(),
     iceServer: {
-        "iceServers": [
+        iceServers: [
             {
-                "url": "stun:stun.l.google.com:19302"
+                urls: ["stun:eu-turn4.xirsys.com"]
+            },
+            {
+                username: "ml0jh0qMKZKd9P_9C0UIBY2G0nSQMCFBUXGlk6IXDJf8G2uiCymg9WwbEJTMwVeiAAAAAF2__hNSaW5vbGVl",
+                credential: "4dd454a6-feee-11e9-b185-6adcafebbb45",
+                urls: [
+                    "turn:eu-turn4.xirsys.com:80?transport=udp",
+                    "turn:eu-turn4.xirsys.com:3478?transport=tcp"
+                ]
             }
         ]
     },
     peerList: {},
-    initRoom() {
-        getUserMedia();
+    async initRoom() {
+        await this.getUserMedia();
+        this.localVideo.get(0).srcObject = this.localStream;
     },
-    closeRoom() { },
-    userJoin() { },
-    userLeave() { },
+    closeRoom() {
+        ROOM.room = null;
+        this.distory();
+        let tracks = this.localStream.getTracks();
+        for (let i in tracks) {
+            tracks[i].stop();
+            this.localStream.removeTrack(tracks[i]);
+        }
+        $("#chatBox").html("");
+    },
+    userJoin(user) {
+        console.log("userJoin", user);
+        this.getPeerConnection(user);
+    },
+    userLeave(user) {
+        console.log("userLeave", user);
+        let account = [user.id, me.id].sort().join("-");
+        if (this.peerList[account] == undefined) {
+            return;
+        }
+        this.removePeer(this.peerList[account]);
+    },
     getUserMedia(constraints = { audio: true, video: { width: 640, height: 480 } }) {
         //获取本地的媒体流，并绑定到一个video标签上输出
         return new Promise((resolve, reject) => {
             navigator.mediaDevices.getUserMedia(constraints)
                 .then(stream => {
-                    this.localStream = stream;
+                    // 清除原有track
+                    let tracks = this.localStream.getTracks();
+                    for (let i in tracks) {
+                        this.localStream.removeTrack(tracks[i]);
+                    }
 
-                    this.localVideo.get(0).srcObject = stream;
+                    // 添加用户音视频track
+                    tracks = stream.getTracks();
+                    for (let i in tracks) {
+                        this.localStream.addTrack(tracks[i]);
+                    }
 
-                    resolve(stream);
+                    resolve(this.localStream);
                 })
                 .catch(err => {
                     console.error(err.name + ': ' + err.message);
@@ -198,10 +237,13 @@ const ROOM = { // 房间内信息转发 roomData
                 });
         });
     },
-    getPeerConnection(newUser) {
-        let account = [newUser.id, user.id].sort().join("-");
+    getPeerConnection(user) {
+        let account = [user.id, me.id].sort().join("-");
 
         let peer = new RTCPeerConnection(this.iceServer);
+
+        peer.account = account;
+        this.peerList[account] = peer;
 
         peer.addStream(this.localStream);
 
@@ -213,7 +255,7 @@ const ROOM = { // 房间内信息转发 roomData
             if (video.length == 0) {
                 video = $("<video>");
                 video.attr({
-                    id: "#rtcVideo-" + account,
+                    id: "rtcVideo-" + account,
                     autoplay: "autoplay"
                 });
                 this.rtcVideoContainer.append(video);
@@ -230,91 +272,140 @@ const ROOM = { // 房间内信息转发 roomData
                     type: "candidate",
                     data: event.candidate,
                     account: account
-                }, [newUser.id]);
+                }, [user.id]);
             }
         };
 
         peer.oniceconnectionstatechange = (evt) => {
             console.log('ICE connection state change: ' + evt.target.iceConnectionState);
-            if (evt.target.iceConnectionState === 'disconnected') { // 断开连接后移除对应video
+            if (evt.target.iceConnectionState === "disconnected") { // 断开连接后移除对应video
                 this.removePeer(peer);
             }
         };
 
-        peer.account = account;
-        this.peerList[account] = peer;
-
-        if (user.id < newUser.id) {
-            this.createOffer(peer);
-        }
+        peer.onnegotiationneeded = (event) => {
+            console.log(arguments);
+            this.createOffer(peer, user);
+        };
     },
-    createOffer(peer) { // 创建offer，发送本地session描述，发送offer
-        peer.createOffer({
+    async createOffer(peer, user) { // 创建offer，发送本地session描述，发送offer
+        let offer = await peer.createOffer({
             offerToReceiveAudio: 1,
             offerToReceiveVideo: 1
-        }).then((desc) => {
-            // console.log('send-offer', desc);
-            peer.setLocalDescription(desc, () => {
-                socket.emit("roomData", {
-                    type: "offer",
-                    data: peer.localDescription,
-                    account: peer.account
-                }, [newUser.id]);
+        });
+        console.log('send-offer', offer);
+        await peer.setLocalDescription(offer);
+        socket.emit("roomData", {
+            type: "offer",
+            data: offer,
+            account: peer.account
+        }, [user.id]);
+    },
+    async onOffer(info) { // 设置远端描述 发送Answer
+        console.log("onOffer", info);
+        await this.peerList[info.account]
+            .setRemoteDescription(new RTCSessionDescription(info.data))
+            .catch(function (err) {
+                console.log('onOffer_ERR:', err);
             });
-        });
+        this.createAnswer(info);
     },
-    onOffer(info) { // 设置远端描述 发送Answer
-        console.log("onOffer", info.data);
-        this.peerList[info.account].setRemoteDescription(info.data.sdp, () => {
-            this.createAnswer(info);
-        }, (err) => {
-            console.log('onOffer_ERR:', err);
-        });
+    async createAnswer(info) { // 创建Answer， 设置本地描述， 发送Answer
+        let answer = await this.peerList[info.account].createAnswer();
+        console.log('send-answer', answer);
+        await this.peerList[info.account].setLocalDescription(answer);
+        socket.emit("roomData", {
+            type: "answer",
+            data: answer,
+            account: info.account
+        }, [info.from]);
     },
-    createAnswer(info) { // 创建Answer， 设置本地描述， 发送Answer
-        this.peerList[info.account]
-            .createAnswer()
-            .then((desc) => {
-                // console.log('send-answer', desc);
-                this.peerList[info.account].setLocalDescription(desc, () => {
-                    socket.emit("roomData", {
-                        type: "answer",
-                        data: this.peerList[info.account].localDescription,
-                        account: account
-                    }, [newUser.id]);
-                });
+    async onAnswer(info) { // 收到Answer后 设置远端描述
+        console.log("onAnswer", info);
+        await this.peerList[info.account]
+            .setRemoteDescription(new RTCSessionDescription(info.data))
+            .catch(function (err) {
+                console.log('onAnswer_ERR:', err);
             });
     },
-    onAnswer(info) { // 收到Answer后 设置远端描述
-        console.log('onAnswer', v);
-        this.peerList[info.account].setRemoteDescription(info.data.sdp, function () { }, (err) => {
-            console.log('onAnswer_ERR:', err);
-        });
-    },
-    onCandidate(info) { // 接收ICE候选，建立P2P连接
-        // console.log('onCandidate', v);
-        if (info.data.candidate) {
-            this.peerList[info.account].addIceCandidate(info.data.candidate).catch((err) => {
+    async onCandidate(info) { // 接收ICE候选，建立P2P连接
+        console.log('onCandidate', info);
+        if (!info.data.candidate) {
+            return;
+        }
+        await this.peerList[info.account]
+            .addIceCandidate(new RTCIceCandidate(info.data))
+            .catch((err) => {
                 console.log('onIceCandidate_ERR:', err);
             });
-        }
     },
     removePeer(peer) {
-        $("#rtcVideo-" + peer.account).remove();
+        console.log("removePeer", peer);
         this.peerList[peer.account].close();
+        this.rtcVideoContainer.find("#rtcVideo-" + peer.account).remove();
         delete this.peerList[peer.account];
+    },
+    updateRoomInfo() {
+        $("#roomName").text(this.room.roomname);
+
+        $("#roomUserList").html(`<div class="list-group-item"><h3><span class="fw-bold fst-italic">参加者:</span></h3></div>`);
+        for (let i in this.room.users) {
+            $("#roomUserList").append(
+                $(`<div class="list-group-item">`).append(
+                    $(`<h4>`).append(
+                        $(`<span class="fw-bold fst-italic">`).text(this.room.users[i].username),
+                        ` (id: ${this.room.users[i].id})`
+                    )
+                )
+            );
+        }
     },
     distory() {
         for (let i in this.peerList) {
-            removePeer(this.peerList[i]);
+            this.removePeer(this.peerList[i]);
         }
     }
 };
 
 socket.on("updateRoomInfo", function (roomInfo) {
-    for (let i in roomInfo.users) {
-        
+    console.log(ROOM.room, roomInfo, me);
+    if (ROOM.room == null) {
+        ROOM.room = roomInfo;
+        ROOM.updateRoomInfo();
+        for (let i in ROOM.room.users) {
+            if (ROOM.room.users[i].id == me.id) {
+                continue;
+            }
+            ROOM.userJoin(ROOM.room.users[i]);
+        }
+        return;
     }
+    let hashList = {};
+    for (let i in ROOM.room.users) {
+        if (ROOM.room.users[i].id == me.id) {
+            continue;
+        }
+        hashList[ROOM.room.users[i].id] = "leave";
+    }
+    for (let i in roomInfo.users) {
+        if (roomInfo.users[i].id == me.id) {
+            continue;
+        }
+        if (hashList[roomInfo.users[i].id] == "leave") {
+            delete hashList[roomInfo.users[i].id];
+            continue;
+        }
+        hashList[roomInfo.users[i].id] = "join";
+    }
+    for (let i in hashList) {
+        if (hashList[i] == "leave") {
+            ROOM.userLeave(ROOM.room.users.find(user => user.id == i));
+        } else {
+            ROOM.userJoin(roomInfo.users.find(user => user.id == i));
+        }
+    }
+    ROOM.room = roomInfo;
+    ROOM.updateRoomInfo();
 });
 
 socket.on("roomData", function (info) {
@@ -324,6 +415,33 @@ socket.on("roomData", function (info) {
     if (info.type == "answer") {
         ROOM.onAnswer(info);
     }
+    if (info.type == "candidate") {
+        ROOM.onCandidate(info);
+    }
+    if (info.type == "chat") {
+        $("#chatBox").append(
+            $(`<div class="list-group-item">`).append(
+                $(`<p>`).append(
+                    $(`<span class="fw-bold fst-italic">`).text(ROOM.room.users.find(user => user.id == info.from).username),
+                    ` ${moment(info.data.time).format("LLLL")} (id: ${info.from})`
+                ),
+                $(`<p>`).text(info.data.message)
+            )
+        );
+    }
+    if (info.type == "chooseGame") { }
+    if (info.type == "gameData") { }
+});
+
+$("#chat").click(function () {
+    let message = $("#chatMessage").val();
+    socket.emit("roomData", {
+        type: "chat",
+        data: {
+            message,
+            time: Date.now
+        }
+    })
 });
 
 ///////////////////////

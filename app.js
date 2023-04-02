@@ -98,6 +98,11 @@ function creatNewRoom(socket, { roomname, roompassword_hash, isPublic, havePassw
         havePassword,
         master: socket.userId,
         users: [],
+        game: {
+            type: "",
+            info: {},
+            data: null
+        },
         reg_date: Date.now()
     };
 
@@ -160,6 +165,7 @@ function updateRoomInfo(room) {
     roomInfo.isPublic = room.isPublic;
     roomInfo.havePassword = room.havePassword;
     roomInfo.reg_date = room.reg_date;
+    roomInfo.game = room.game;
 
     let user = findUser("id", room.master);
 
@@ -280,7 +286,20 @@ io.on("connection", function (socket) {
         if (socket.userId == undefined || socket.roomId == undefined) {
             return;
         }
+        info.from = socket.userId;
         let room = findRoom("id", socket.roomId);
+
+        if (info.type == "chooseGame") {
+            if (socket.userId != room.master) {
+                return;
+            }
+            room.game.type = info.data;
+            room.game.info = {};
+        }
+
+        if (info.type == "gameData") {
+            room.game.data = info.data;
+        }
 
         to = to || room.users;
 
@@ -289,13 +308,14 @@ io.on("connection", function (socket) {
                 continue;
             }
             let user = findUser("id", to[i]);
+            console.log(info, user.id)
             user.socket.emit("roomData", info);
         }
     });
 
     // 结束链接
     socket.on("disconnect", function (message) {
-        console.log("链接取消", socket.handshake.address, socket.id);
+        console.log("链接取消", socket.handshake.address, socket.id, message);
         if (socket.userId == undefined) {
             return;
         }

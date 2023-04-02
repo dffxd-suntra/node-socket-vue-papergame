@@ -2,11 +2,11 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=410; user-scalable=no; minimal-ui">
+    <meta name="viewport" content="width=410; user-scalable=no; minimal-ui" />
     <title>登陆界面</title>
     <link rel="stylesheet" href="./lib/bootstrap-5.3.0/css/bootstrap.cosmo.min.css" />
     <link rel="stylesheet" href="./lib/bootstrap-icons-1.10.3/bootstrap-icons.css" />
-    <link rel="stylesheet" href="./lib/chessboard-0.3.0.min.css" />
+    <link rel="stylesheet" href="./lib/chessboardjs-1.0.0/css/chessboard-1.0.0.min.css">
     <link rel="stylesheet" href="./default.css" />
 </head>
 
@@ -62,43 +62,58 @@
         <div id="userList">
             没有在线用户
         </div> -->
-    </div>
 
-    <!-- 房间界面 -->
-    <div class="page room container-sm" id="page-game" style="display: none;">
-        <h1>房间界面</h1>
-        <button id="leave" class="btn btn-secondary">离开房间</button>
-        <video id="localVideo" autoplay="autoplay"></video>
-        <div id="rtcVideoContainer"></div>
-    </div>
-
-    <!-- 加入房间模态 -->
-    <div class="page join modal" tabindex="-1" id="page-join">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">加入带密码的房间</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <label class="form-label" for="joinpassword">密码:</label>
-                    <input id="joinpassword" type="password" class="form-control" />
-                    <p id="join-warn"></p>
-                    <button id="join" class="btn btn-secondary">加入</button>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        <!-- 加入房间模态 -->
+        <div class="page join modal" tabindex="-1" id="page-join">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">加入带密码的房间</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label" for="joinpassword">密码:</label>
+                        <input id="joinpassword" type="password" class="form-control" />
+                        <p id="join-warn"></p>
+                        <button id="join" class="btn btn-secondary">加入</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 房间界面 -->
+    <div class="page room container-sm" id="page-game" style="display: none;">
+        <h1>房间界面</h1>
+        <h2 id="roomName"></h2>
+        <button id="leave" class="btn btn-secondary">离开房间</button>
+        <video id="localVideo" autoplay="autoplay"></video>
+        <div id="rtcVideoContainer"></div>
+        <div class="list-group" id="roomUserList">
+        </div>
+        <div class="list-group chat-container">
+            <div class="list-group list-group-flush list-group-item" id="chatBox">
+            </div>
+            <div class="list-group-item">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="chatMessage" placeholder="输入消息" />
+                    <button class="btn btn-outline-secondary" type="button" id="chat">聊天</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./lib/chess.js-0.13.4/chess.js"></script>
+    <script src="./lib/chessboardjs-1.0.0/js/chessboard-1.0.0.min.js"></script>
     <script src="./lib/socket.io.js"></script>
     <script src="./lib/jquery.min.js"></script>
-    <script src="./lib/chess.min.js"></script>
-    <script src="./lib/chessboard-0.3.0.min.js"></script>
     <script src="./lib/md5.min.js"></script>
     <script src="./lib/bootstrap-5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="./lib/moment-2.29.4/moment.js"></script>
+    <script src="./lib/moment-2.29.4/locale/zh-cn.js"></script>
     <script src="default.js"></script>
 </body>
 
